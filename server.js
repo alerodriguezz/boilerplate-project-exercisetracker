@@ -36,8 +36,21 @@ app.get('/', (req, res) => {
   res.sendFile(__dirname + '/views/index.html')
 });
 
+//return all users
+app.get('/api/users', (req, res) => {
+
+  User.find({}, (err,data )=> {
+    if (!data){
+      res.send("No users")
+    }
+    else{
+       res.json(data)
+    }
+  });
+});
 
 
+//post new user 
 app.post('/api/users',(req,res)=> {
 const newUser = new User({username: req.body.username});
 newUser.save((err,data) => {
@@ -51,6 +64,8 @@ newUser.save((err,data) => {
 
 });
 
+
+//add exercises 
 app.post('/api/users/:_id/exercises', (req,res) => {
   const id = req.params._id
   const {description,duration,date} = req.body;
