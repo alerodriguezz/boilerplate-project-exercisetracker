@@ -39,7 +39,6 @@ app.get('/', (req, res) => {
 
 //return all users
 app.get('/api/users', (req, res) => {
-
   User.find({}, (err,data )=> {
     if (!data){
       res.send("No users")
@@ -53,6 +52,7 @@ app.get('/api/users', (req, res) => {
 
 //post new user 
 app.post('/api/users',(req,res)=> {
+  console.log("adding user...", req.body.username);
 const newUser = new User({username: req.body.username});
 newUser.save((err,data) => {
   if(err){
@@ -68,16 +68,24 @@ newUser.save((err,data) => {
 //retrieve logs 
 app.get('/api/users/:_id/logs', (req, res) => {
   const id = req.params._id;
-  console.log(id, "... getting logs");
+  console.log("getting logs for...", id );
   var {from,to,limit} = req.query;
-
-  //Some test cases had negative limit values so this is to account for that 
-    if (!Number.isInteger(limit) || value < 0) {
+  //limit handling
+    if (!limit || Number.isInteger(limit) || limit < 0) {
     limit = null;
   }
+  //from and to handling
+  function isValidDate(dateString) {
+  var regEx = /^\d{4}-\d{2}-\d{2}$/;
+  if(!dateString.match(regEx)) return false;  // Invalid format
+  var d = new Date(dateString);
+  var dNum = d.getTime();
+  if(!dNum && dNum !== 0) return false; // NaN value, Invalid date
+  return d.toISOString().slice(0,10) === dateString;
+  }
 
-  if ( from == undefined) from = null;
-  if (to == undefined ) to = null;
+  if ( !from || !isValidDate(from)) from = null;
+  if (!to ||  !isValidDate(to)) to = null;
 
   User.findById(id,(err,data) => {
 if(!data){
@@ -86,8 +94,8 @@ if(!data){
 }
 else{
          
-          const userName= data.username;
-          console.log("from: ", from, "to: ", to, "limit: ", limit);
+     const userName= data.username;
+     console.log("from: ", from, "to: ", to, "limit: ", limit);
           Exercise.find({"userId":id},{date: {$gte: new Date(from), $lte: new Date(to) }}).select(["username","description","duration","date","userId"]).limit(+limit).exec((err,data)=>{
                           //change date format using toDateString method as suggested in fcc's prompt 
                           if(!data){
@@ -97,18 +105,19 @@ else{
                               "count":0,
                               "log": []})}
                             else{
-                                  let myData={}
+                                  let myData=[];
                               try{
+                                
                                myData = data.map(exer => {
                             
                                         let dateFormatted = new Date(exer.date).toDateString();
                                        // console.log("id: ",exer.id,"description: ","description: ", exer.description, "duration: ", exer.duration, "date: ", dateFormatted);
-                                        return { description: exer.description, duration: exer.duration, date: new Date(exer.date).toDateString()};
+                                        return { description: exer.description, duration: exer.duration, date: dateFormatted};
                                       })
                               res.json({
-                                "_id": id,
                                 "username": userName,
                                 "count": data.length,
+                                 "_id": id,
                                 "log": myData
                               })
                             }
@@ -126,8 +135,8 @@ else{
 //add exercises 
 app.post('/api/users/:_id/exercises', (req,res) => {
   const id = req.params._id
-  const {description,duration,date} = req.body;
-  console.log(id,"...adding exercise")
+  var {description,duration,date} = req.body;
+  console.log("adding exercise...", id)
   User.findById(id,(err,data)=> {
     if(!data){
       res.send("Cast to ObjectId failed for value "+ id+" at path _id for model User")
@@ -135,10 +144,11 @@ app.post('/api/users/:_id/exercises', (req,res) => {
     else {
       const username = data.username;
 
-        if (date == '') {
-                let today = new Date()
-                date = today.toDateString()
+        if (!date || date == "Invalid Date") {
+                 
+                date = new Date();
             }
+            
   const newExercise = new Exercise ({username,description,duration,date,userId: id});
   newExercise.save((err,data)=>{
        if(err){
@@ -146,7 +156,7 @@ app.post('/api/users/:_id/exercises', (req,res) => {
          res.send("Error adding exercise.");
        }
        else{
-        res.json({username, description, duration: +duration, date: new Date(date).toDateString(), "_id":id})
+        res.json({username, description, duration: +duration, date: new Date(date).toDateString() , "_id":id})
         }
      })
     }
